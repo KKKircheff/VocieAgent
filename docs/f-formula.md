@@ -2394,7 +2394,8 @@ Thanks again for going through The F Formula! And remember: the art of flirting,
 any other skill you’re trying to master, requires practice and patience. They say it takes 30
 days to create a habit, and 90 days to make it stick.
 88
-So please—take the information you just learned and put it into practice. It's an investment
+So please—take the information you just learned and put it into practice. It's an investmen
+
 in your dating life. Learn one Phase at a time. I guarantee that if you do, women will be all
 over you before you know it!
 Remember: a man who understands women will win the attention of any woman he wants.

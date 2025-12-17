@@ -1,8 +1,9 @@
-import { VoiceChat } from '@/components/VoiceChat';
+import { VoiceChat } from '@/components/voice-chat/voice-chat';
+import { GradientCard } from '@/components/shared/gradient-card';
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-slate-purple">
       <main className="flex flex-col items-center justify-center gap-8 p-8 max-w-2xl w-full">
         <div className="text-center space-y-4">
           <h1 className="text-5xl font-bold text-white tracking-tight">
@@ -13,9 +14,9 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
+        <GradientCard className="w-full">
           <VoiceChat />
-        </div>
+        </GradientCard>
 
         <div className="text-center text-sm text-white/40">
           <p>Set NEXT_PUBLIC_GEMINI_API_KEY in .env.local</p>

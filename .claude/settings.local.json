@@ -3,7 +3,9 @@
     "allow": [
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(npx shadcn@latest add card badge progress scroll-area alert --yes)"
     ]
   }
 }

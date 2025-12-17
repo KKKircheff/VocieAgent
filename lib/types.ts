@@ -39,6 +39,13 @@ export interface ServerMessage {
   data?: string;
 }
 
+// Parsed server message (returned by parseServerMessage)
+export interface ParsedServerMessage {
+  text?: string;
+  audioData?: string;
+  turnComplete: boolean;
+}
+
 // Audio configuration
 export interface AudioConfig {
   sampleRate: number;

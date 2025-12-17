@@ -37,14 +37,14 @@ export async function connectLiveSession(
     const config: SessionConfig = {
       model: GEMINI_MODELS.LIVE_FLASH_NATIVE,
       systemInstruction,
-      responseModalities: ['AUDIO'],
+      responseModalities: ['AUDIO'] as const,
     };
 
     // Connect to Live API with callbacks
     const session = await ai.live.connect({
       model: config.model,
       config: {
-        responseModalities: config.responseModalities,
+        responseModalities: config.responseModalities as any,
         systemInstruction: config.systemInstruction,
       },
       callbacks: {
@@ -52,8 +52,8 @@ export async function connectLiveSession(
           console.log('[Gemini] Connected');
           callbacks.onOpen?.();
         },
-        onmessage: (message: ServerMessage) => {
-          callbacks.onMessage?.(message);
+        onmessage: (message: any) => {
+          callbacks.onMessage?.(message as ServerMessage);
         },
         onerror: (event: any) => {
           console.error('[Gemini] Error:', event.message || 'Connection error');
@@ -93,6 +93,11 @@ export function sendAudioChunk(session: LiveSession, base64Audio: string): void 
 
 /**
  * Parse server message and extract relevant data
+ *
+ * Note: The Gemini SDK may log warnings about "non-text parts inlineData"
+ * or "non-data parts text,thought" when responses contain mixed content types
+ * (text + audio + thought). These are informational and expected when using
+ * AUDIO response modality. The warnings are suppressed in VoiceChat.tsx.
  */
 export function parseServerMessage(message: any): {
   text?: string;

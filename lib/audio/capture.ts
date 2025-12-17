@@ -9,7 +9,7 @@ import type { AudioConfig } from '../types';
 export const DEFAULT_AUDIO_CONFIG: AudioConfig = {
   sampleRate: 16000, // 16kHz required by Gemini
   channels: 1,       // Mono
-  bufferSize: 4096,  // Process 4096 samples at a time
+  bufferSize: 4096,  // Process 4096 samples at a time (256ms @ 16kHz)
 };
 
 /**
@@ -145,7 +145,7 @@ export function createAudioProcessor(
       const nativeSampleRate = audioContext!.sampleRate;
 
       // Resample if needed (browser native -> 16kHz for Gemini)
-      let processedData = inputData;
+      let processedData: Float32Array = inputData;
       if (nativeSampleRate !== config.sampleRate) {
         processedData = resampleAudio(inputData, nativeSampleRate, config.sampleRate);
       }
