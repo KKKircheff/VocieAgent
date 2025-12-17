@@ -39,11 +39,19 @@ export interface ServerMessage {
   data?: string;
 }
 
+// Token usage metadata
+export interface TokenUsage {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+}
+
 // Parsed server message (returned by parseServerMessage)
 export interface ParsedServerMessage {
   text?: string;
   audioData?: string;
   turnComplete: boolean;
+  usageMetadata?: TokenUsage;
 }
 
 // Audio configuration

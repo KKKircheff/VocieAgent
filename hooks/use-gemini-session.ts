@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { loadDocumentContext } from '@/app/actions';
 import { connectLiveSession, sendAudioChunk, parseServerMessage, closeSession } from '@/lib/gemini';
-import type { LiveSession, ParsedServerMessage } from '@/lib/types';
+import type { LiveSession, ParsedServerMessage, TokenUsage } from '@/lib/types';
 
 interface UseGeminiSessionOptions {
   onMessage?: (message: ParsedServerMessage) => void;
@@ -16,6 +16,7 @@ interface UseGeminiSessionReturn {
   sendAudio: (base64Audio: string) => void;
   session: LiveSession | null;
   error: string | null;
+  tokenUsage: TokenUsage | null;
 }
 
 /**
@@ -28,6 +29,7 @@ interface UseGeminiSessionReturn {
 export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSessionReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   const sessionRef = useRef<LiveSession | null>(null);
 
@@ -51,6 +53,19 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
         },
         onMessage: (message) => {
           const parsed = parseServerMessage(message);
+
+          // Update cumulative token usage if available
+          if (parsed.usageMetadata) {
+            setTokenUsage(prev => {
+              if (!prev) return parsed.usageMetadata!;
+
+              return {
+                promptTokenCount: (prev.promptTokenCount || 0) + (parsed.usageMetadata!.promptTokenCount || 0),
+                candidatesTokenCount: (prev.candidatesTokenCount || 0) + (parsed.usageMetadata!.candidatesTokenCount || 0),
+                totalTokenCount: (prev.totalTokenCount || 0) + (parsed.usageMetadata!.totalTokenCount || 0),
+              };
+            });
+          }
 
           // Call user-provided onMessage callback
           if (options?.onMessage) {
@@ -94,6 +109,7 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
 
     setIsConnected(false);
     setError(null);
+    setTokenUsage(null);
   };
 
   const sendAudio = (base64Audio: string): void => {
@@ -118,5 +134,6 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
     sendAudio,
     session: sessionRef.current,
     error,
+    tokenUsage,
   };
 }

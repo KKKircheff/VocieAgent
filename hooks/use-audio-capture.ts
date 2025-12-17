@@ -32,13 +32,13 @@ export function useAudioCapture(): UseAudioCaptureReturn {
       const processor = createAudioProcessor();
       audioProcessorRef.current = processor;
 
-      // Get analyser for volume visualization
-      const analyserNode = processor.getAnalyser();
-      setAnalyser(analyserNode);
-
       // Start capturing and sending audio chunks
       const stopCapture = await processor.start(onChunk);
       stopCaptureRef.current = stopCapture;
+
+      // Get analyser for volume visualization (after start creates it)
+      const analyserNode = processor.getAnalyser();
+      setAnalyser(analyserNode);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start recording';
       setError(message);

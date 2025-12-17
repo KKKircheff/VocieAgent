@@ -12,6 +12,7 @@ import { VolumeBar } from './volume-bar';
 import { ErrorAlert } from './error-alert';
 import { TranscriptDisplay } from './transcript-display';
 import { WelcomeMessage } from './welcome-message';
+import { TokenUsageDisplay } from './token-usage-display';
 
 import type { Message } from '@/lib/types';
 
@@ -100,6 +101,14 @@ export function VoiceChat() {
 
       {/* Welcome message for new users */}
       <WelcomeMessage show={!geminiSession.isConnected} />
+
+      {/* Token usage display - centered below card */}
+      <div className="flex justify-center">
+        <TokenUsageDisplay
+          usage={geminiSession.tokenUsage}
+          isConnected={geminiSession.isConnected}
+        />
+      </div>
     </div>
   );
 }
