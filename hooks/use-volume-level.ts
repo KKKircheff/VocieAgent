@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { calculateVolumeLevel } from '@/lib/audio/capture';
+import { calculateVolumeLevel } from '@/lib/audio/capture-modern';
 
 interface UseVolumeLevelReturn {
   volumeLevel: number; // 0-100

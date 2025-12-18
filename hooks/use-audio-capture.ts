@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { createAudioProcessor } from '@/lib/audio/capture';
+import { createAudioProcessor } from '@/lib/audio/capture-modern';
 
 interface UseAudioCaptureReturn {
   isRecording: boolean;

@@ -1,7 +1,8 @@
 import {useState, useRef} from 'react';
-import {loadDocumentContext} from '@/app/actions';
+import {getGeminiApiKey} from '@/app/actions';
 import {connectLiveSession, sendAudioChunk, parseServerMessage, closeSession} from '@/lib/gemini';
 import type {LiveSession, ParsedServerMessage, TokenUsage} from '@/lib/types';
+import {loadDocumentContext} from '@/lib/system-instruction/format';
 
 interface UseGeminiSessionOptions {
     onMessage?: (message: ParsedServerMessage) => void;
@@ -37,10 +38,8 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
         setError(null);
 
         try {
-            const apiKey = process.env.GEMINI_API_KEY;
-            if (!apiKey) {
-                throw new Error('GEMINI_API_KEY not set in .env.local');
-            }
+            // Securely fetch API key from server action
+            const apiKey = await getGeminiApiKey();
 
             const systemInstruction = options?.systemInstruction || (await loadDocumentContext());
 

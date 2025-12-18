@@ -1,5 +1,8 @@
 /**
- * Audio Capture Utilities
+ * @deprecated This file uses deprecated ScriptProcessorNode API
+ * Use capture-modern.ts instead, which uses AudioWorkletNode
+ *
+ * Audio Capture Utilities (LEGACY)
  * Handles microphone access, audio processing, and PCM conversion for Gemini Live API
  */
 

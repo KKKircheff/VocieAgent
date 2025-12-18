@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGeminiSession } from '@/hooks/use-gemini-session';
 import { useAudioCapture } from '@/hooks/use-audio-capture';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
@@ -23,92 +23,100 @@ import type { Message } from '@/lib/types';
  * Reduced from 283 lines to ~80 lines through proper separation of concerns.
  */
 export function VoiceChat() {
-  const [transcript, setTranscript] = useState<Message[]>([]);
+    const [transcript, setTranscript] = useState<Message[]>([]);
 
-  // Custom hooks manage all business logic
-  const audioPlayback = useAudioPlayback(24000);
-  const audioCapture = useAudioCapture();
-  const volumeLevel = useVolumeLevel(audioCapture.analyser, audioCapture.isRecording);
+    // Custom hooks manage all business logic
+    const audioPlayback = useAudioPlayback(24000);
+    const audioCapture = useAudioCapture();
+    const volumeLevel = useVolumeLevel(audioCapture.analyser, audioCapture.isRecording);
 
-  const geminiSession = useGeminiSession({
-    onMessage: (message) => {
-      // Handle text response - add to transcript
-      if (message.text) {
-        setTranscript((prev) => [
-          ...prev,
-          {
-            role: 'model',
-            content: message.text!,
-            timestamp: Date.now(),
-          },
-        ]);
-      }
+    const geminiSession = useGeminiSession({
+        onMessage: (message) => {
+            // Handle text response - add to transcript
+            if (message.text) {
+                setTranscript((prev) => [
+                    ...prev,
+                    {
+                        role: 'model',
+                        content: message.text!,
+                        timestamp: Date.now(),
+                    },
+                ]);
+            }
 
-      // Handle audio response - play through speakers
-      if (message.audioData) {
-        audioPlayback.play(message.audioData).catch((err) => {
-          console.error('[VoiceChat] Audio playback error:', err);
-        });
-      }
-    },
-  });
+            // Handle audio response - play through speakers
+            if (message.audioData) {
+                audioPlayback.play(message.audioData).catch((err) => {
+                    console.error('[VoiceChat] Audio playback error:', err);
+                });
+            }
+        },
+    });
 
-  // Start recording and stream audio to Gemini
-  const handleStartRecording = async () => {
-    try {
-      await audioCapture.startRecording(geminiSession.sendAudio);
-    } catch (error) {
-      console.error('[VoiceChat] Failed to start recording:', error);
-    }
-  };
+    useEffect(() => {
+        return () => {
+            audioCapture.stopRecording();
+            audioPlayback.stop();
+            geminiSession.disconnect();
+        };
+    }, []);
 
-  // Disconnect and cleanup all resources
-  const handleDisconnect = () => {
-    audioCapture.stopRecording();
-    audioPlayback.stop();
-    geminiSession.disconnect();
-    setTranscript([]);
-  };
+    // Start recording and stream audio to Gemini
+    const handleStartRecording = async () => {
+        try {
+            await audioCapture.startRecording(geminiSession.sendAudio);
+        } catch (error) {
+            console.error('[VoiceChat] Failed to start recording:', error);
+        }
+    };
 
-  // Combine errors from both session and capture
-  const error = geminiSession.error || audioCapture.error;
+    // Disconnect and cleanup all resources
+    const handleDisconnect = () => {
+        audioCapture.stopRecording();
+        audioPlayback.stop();
+        geminiSession.disconnect();
+        setTranscript([]);
+    };
 
-  return (
-    <div className="w-full space-y-6">
-      {/* Connection status and controls */}
-      <ConnectionControls
-        isConnected={geminiSession.isConnected}
-        onConnect={geminiSession.connect}
-        onDisconnect={handleDisconnect}
-      />
+    // Combine errors from both session and capture
+    const error = geminiSession.error || audioCapture.error;
 
-      {/* Recording controls (Start/Stop) */}
-      <RecordingControls
-        isRecording={audioCapture.isRecording}
-        isConnected={geminiSession.isConnected}
-        onStart={handleStartRecording}
-        onStop={audioCapture.stopRecording}
-      />
+    return (
+        <div className="w-full space-y-6">
+            {/* Connection status and controls */}
+            <ConnectionControls
+                isConnected={geminiSession.isConnected}
+                onConnect={geminiSession.connect}
+                onDisconnect={handleDisconnect}
+            />
 
-      {/* Volume visualization during recording */}
-      <VolumeBar level={volumeLevel.volumeLevel} show={audioCapture.isRecording} />
+            {/* Recording controls (Start/Stop) */}
+            <RecordingControls
+                isRecording={audioCapture.isRecording}
+                isConnected={geminiSession.isConnected}
+                onStart={handleStartRecording}
+                onStop={audioCapture.stopRecording}
+            />
 
-      {/* Error display */}
-      <ErrorAlert error={error} />
+            {/* Volume visualization during recording */}
+            <VolumeBar level={volumeLevel.volumeLevel} show={audioCapture.isRecording} />
 
-      {/* Conversation transcript */}
-      <TranscriptDisplay messages={transcript} />
+            {/* Error display */}
+            <ErrorAlert error={error} />
 
-      {/* Welcome message for new users */}
-      <WelcomeMessage show={!geminiSession.isConnected} />
+            {/* Conversation transcript */}
+            <TranscriptDisplay messages={transcript} />
 
-      {/* Token usage display - centered below card */}
-      <div className="flex justify-center">
-        <TokenUsageDisplay
-          usage={geminiSession.tokenUsage}
-          isConnected={geminiSession.isConnected}
-        />
-      </div>
-    </div>
-  );
+            {/* Welcome message for new users */}
+            <WelcomeMessage show={!geminiSession.isConnected} />
+
+            {/* Token usage display - centered below card */}
+            <div className="flex justify-center">
+                <TokenUsageDisplay
+                    usage={geminiSession.tokenUsage}
+                    isConnected={geminiSession.isConnected}
+                />
+            </div>
+        </div>
+    );
 }
