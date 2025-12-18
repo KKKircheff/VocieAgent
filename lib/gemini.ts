@@ -1,9 +1,4 @@
-/**
- * Gemini Live API Session Wrapper
- * Handles WebSocket connection, audio streaming, and message processing
- */
-
-import {GoogleGenAI} from '@google/genai';
+import {GoogleGenAI, Modality} from '@google/genai';
 import type {LiveSession, ServerMessage, SessionConfig} from './types';
 
 // Model names
@@ -12,9 +7,6 @@ export const GEMINI_MODELS = {
     LIVE_FLASH_NATIVE: 'gemini-2.5-flash-native-audio-preview-12-2025',
 } as const;
 
-/**
- * Create and connect to Gemini Live API session
- */
 export async function connectLiveSession(
     apiKey: string,
     systemInstruction: string,
@@ -26,25 +18,22 @@ export async function connectLiveSession(
     }
 ): Promise<LiveSession> {
     if (!apiKey) {
-        throw new Error('API key is required. Please set NEXT_PUBLIC_GEMINI_API_KEY in .env.local');
+        throw new Error('API key is required. Please set GEMINI_API_KEY in .env.local');
     }
 
     try {
-        // Initialize Gemini client
         const ai = new GoogleGenAI({apiKey});
 
-        // Session configuration
         const config: SessionConfig = {
             model: GEMINI_MODELS.LIVE_FLASH_NATIVE,
             systemInstruction,
             responseModalities: ['AUDIO'] as const,
         };
 
-        // Connect to Live API with callbacks
         const session = await ai.live.connect({
             model: config.model,
             config: {
-                responseModalities: config.responseModalities as any,
+                responseModalities: config.responseModalities as Modality[],
                 systemInstruction: config.systemInstruction,
             },
             callbacks: {
@@ -76,9 +65,6 @@ export async function connectLiveSession(
     }
 }
 
-/**
- * Send audio chunk to Gemini session
- */
 export function sendAudioChunk(session: LiveSession, base64Audio: string): void {
     try {
         session.sendRealtimeInput({
@@ -171,9 +157,6 @@ export function parseServerMessage(message: any): {
     return result;
 }
 
-/**
- * Close Gemini session gracefully
- */
 export function closeSession(session: LiveSession): void {
     try {
         session.close();
