@@ -1,8 +1,5 @@
 import {useState, useRef} from 'react';
-import {getGeminiApiKey} from '@/app/actions';
-import {connectLiveSession, sendAudioChunk, parseServerMessage, closeSession} from '@/lib/gemini';
-import type {LiveSession, ParsedServerMessage, TokenUsage} from '@/lib/types';
-import {loadDocumentContext} from '@/lib/system-instruction/format';
+import type {ParsedServerMessage, TokenUsage} from '@/lib/types';
 
 interface UseGeminiSessionOptions {
     onMessage?: (message: ParsedServerMessage) => void;
@@ -15,14 +12,15 @@ interface UseGeminiSessionReturn {
     connect: () => Promise<void>;
     disconnect: () => void;
     sendAudio: (base64Audio: string) => void;
-    session: LiveSession | null;
     error: string | null;
     tokenUsage: TokenUsage | null;
 }
 
 /**
- * Custom hook for managing Gemini Live API WebSocket connection.
- * Handles connection lifecycle, message routing, and error handling.
+ * Custom hook for managing Gemini Live API session via HTTP streaming proxy.
+ *
+ * Security: API key stays server-side, client communicates via HTTP endpoints.
+ * Uses Server-Sent Events (SSE) for receiving responses from Gemini.
  *
  * @param options - Callbacks and configuration for the session
  * @returns Session controls, connection status, and error state
@@ -32,23 +30,43 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
     const [error, setError] = useState<string | null>(null);
     const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
-    const sessionRef = useRef<LiveSession | null>(null);
+    const sessionIdRef = useRef<string | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
 
     const connect = async (): Promise<void> => {
         setError(null);
 
         try {
-            // Securely fetch API key from server action
-            const apiKey = await getGeminiApiKey();
+            // 1. Create session on server (API key stays server-side)
+            const response = await fetch('/api/gemini/session', {method: 'POST'});
 
-            const systemInstruction = options?.systemInstruction || (await loadDocumentContext());
+            if (!response.ok) {
+                throw new Error(`Failed to create session: ${response.statusText}`);
+            }
 
-            const session = await connectLiveSession(apiKey, systemInstruction, {
-                onOpen: () => {
-                    setIsConnected(true);
-                },
-                onMessage: (message) => {
-                    const parsed = parseServerMessage(message);
+            const {sessionId} = await response.json();
+            sessionIdRef.current = sessionId;
+
+            console.log(`[useGeminiSession] Session created: ${sessionId}`);
+
+            // 2. Establish Server-Sent Events stream for responses
+            const eventSource = new EventSource(`/api/gemini/stream?sessionId=${sessionId}`);
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const parsed = JSON.parse(event.data) as ParsedServerMessage;
+
+                    // Skip connection messages
+                    if ('type' in parsed && parsed.type === 'connected') {
+                        console.log('[useGeminiSession] Stream connected');
+                        return;
+                    }
+
+                    // Skip timeout messages
+                    if ('type' in parsed && parsed.type === 'timeout') {
+                        console.log('[useGeminiSession] Stream timeout, will reconnect');
+                        return;
+                    }
 
                     // Update cumulative token usage if available
                     if (parsed.usageMetadata) {
@@ -71,25 +89,28 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
                     if (options?.onMessage) {
                         options.onMessage(parsed);
                     }
-                },
-                onError: (err) => {
-                    const errorMessage = err instanceof Error ? err.message : 'Connection error';
-                    setError(errorMessage);
+                } catch (err) {
+                    console.error('[useGeminiSession] Parse error:', err);
+                }
+            };
 
-                    // Call user-provided onError callback
-                    if (options?.onError) {
-                        options.onError(err instanceof Error ? err : new Error(errorMessage));
-                    }
-                },
-                onClose: (reason) => {
-                    setIsConnected(false);
-                    sessionRef.current = null;
-                },
-            });
+            eventSource.onerror = (err) => {
+                const errorMessage = 'Stream connection error';
+                console.error('[useGeminiSession] SSE error:', err);
+                setError(errorMessage);
 
-            sessionRef.current = session;
+                if (options?.onError) {
+                    options.onError(new Error(errorMessage));
+                }
+
+                // Don't set isConnected to false on error - stream may reconnect
+            };
+
+            eventSourceRef.current = eventSource;
+            setIsConnected(true);
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to connect';
+            console.error('[useGeminiSession] Connect error:', err);
             setError(message);
             setIsConnected(false);
 
@@ -102,29 +123,48 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
     };
 
     const disconnect = (): void => {
-        if (sessionRef.current) {
-            closeSession(sessionRef.current);
-            sessionRef.current = null;
+        // Close SSE stream
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
+        }
+
+        // Close server-side session
+        if (sessionIdRef.current) {
+            fetch(`/api/gemini/session?sessionId=${sessionIdRef.current}`, {
+                method: 'DELETE',
+            }).catch((err) => {
+                console.error('[useGeminiSession] Error closing session:', err);
+            });
+
+            sessionIdRef.current = null;
         }
 
         setIsConnected(false);
         setError(null);
         setTokenUsage(null);
+
+        console.log('[useGeminiSession] Disconnected');
     };
 
     const sendAudio = (base64Audio: string): void => {
-        if (!sessionRef.current) {
+        if (!sessionIdRef.current) {
             console.warn('[useGeminiSession] Cannot send audio: not connected');
             return;
         }
 
-        try {
-            sendAudioChunk(sessionRef.current, base64Audio);
-        } catch (err) {
-            console.error('[useGeminiSession] Failed to send audio chunk:', err);
-            const message = err instanceof Error ? err.message : 'Failed to send audio';
-            setError(message);
-        }
+        // Send audio chunk to server via HTTP POST
+        fetch('/api/gemini/audio', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                sessionId: sessionIdRef.current,
+                audioData: base64Audio,
+            }),
+        }).catch((err) => {
+            console.error('[useGeminiSession] Failed to send audio:', err);
+            setError(err instanceof Error ? err.message : 'Failed to send audio');
+        });
     };
 
     return {
@@ -132,7 +172,6 @@ export function useGeminiSession(options?: UseGeminiSessionOptions): UseGeminiSe
         connect,
         disconnect,
         sendAudio,
-        session: sessionRef.current,
         error,
         tokenUsage,
     };
